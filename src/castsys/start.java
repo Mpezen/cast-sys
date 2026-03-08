@@ -35,6 +35,8 @@ public class start extends JFrame {
     }
 
     public start() {
+    	Connection con = DBcon.getConnection();
+    	
         setResizable(false);
         setTitle("CAST-SYS-LI TAYO");
         setIconImage(new ImageIcon("logocast.png").getImage());
@@ -93,6 +95,21 @@ public class start extends JFrame {
         lblProfitGoal.setFont(new Font("Segoe UI", Font.BOLD, 24));
         lblProfitGoal.setBounds(50, 121, 136, 40);
         dashboardContent.add(lblProfitGoal);
+        
+        if(con != null)
+        {
+        JLabel dbcheck = new JLabel("Database is Connected");
+        dbcheck.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        dbcheck.setBounds(50, 96, 188, 14);
+        dashboardContent.add(dbcheck);
+        }
+        else
+        {
+        	JLabel dbcheck = new JLabel("Database is NOT Connected");
+            dbcheck.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            dbcheck.setBounds(50, 96, 188, 14);
+            dashboardContent.add(dbcheck);
+        }
 
         // ===== Garage Content =====
         JPanel garageContent = new JPanel(null);

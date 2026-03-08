@@ -7,16 +7,12 @@ public class DBcon {
 
     public static Connection getConnection() {
         Connection con = null;
+        
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
 
-            con = DriverManager.getConnection(
-                "jdbc:mysql://localhost:3306/cast-sys",
-                "root",
-                ""   // default XAMPP password is empty
-            );
-
-            System.out.println("Connected to database!");
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/cast-sys", "root", "");   
+            // walang pass
 
         } catch (ClassNotFoundException | SQLException e) {
             e.printStackTrace();
