@@ -11,7 +11,7 @@ public class DBcon {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
 
-            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/cast-sys", "root", "");   
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/cast_sys", "root", "");   
             // walang pass
 
         } catch (ClassNotFoundException | SQLException e) {
