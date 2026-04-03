@@ -247,7 +247,6 @@ public class start extends JFrame {
                 String fixedPriceStr = FixedPriceInput.getText().trim();
                 String stockStr = StockInput.getText().trim();
                 
-                // Handle Discount (even if other fields are empty)
                 String discountRaw = comboBox.getSelectedItem().toString().replace("%", "");
                 double discountRate = Double.parseDouble(discountRaw) / 100.0;
 
@@ -255,9 +254,6 @@ public class start extends JFrame {
                 if (con != null) {
                     try {
                         con.setAutoCommit(false);
-
-                        // 2. ALWAYS Update garagetable (Table-wide Price/Discount)
-                        // We use COALESCE or simple VALUES to update even if FixedPrice is empty in UI
                         String sqlGarage = "INSERT INTO garagetable (TableId, FixedPrice, DiscountRate) " +
                                            "VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE " +
                                            "FixedPrice = IF(VALUES(FixedPrice) = 0, FixedPrice, VALUES(FixedPrice)), " +
@@ -265,14 +261,12 @@ public class start extends JFrame {
                         
                         try (java.sql.PreparedStatement psGarage = con.prepareStatement(sqlGarage)) {
                             psGarage.setInt(1, Integer.parseInt(tableIdStr));
-                            // If fixedPrice is empty, send 0 (the IF logic in SQL handles keeping old price)
+                          
                             psGarage.setInt(2, fixedPriceStr.isEmpty() ? 0 : Integer.parseInt(fixedPriceStr));
                             psGarage.setDouble(3, discountRate);
                             psGarage.executeUpdate();
                         }
 
-                        // 3. CONDITIONALLY Update categories
-                        // Only runs if a Category Name is actually provided
                         if (!categoryName.isEmpty()) {
                             String sqlCategory = "INSERT INTO categories (TableId, CategoryName, Stock) " +
                                                  "VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE " +
@@ -288,7 +282,7 @@ public class start extends JFrame {
 
                         con.commit();
                         JOptionPane.showMessageDialog(null, "Table " + tableIdStr + " settings updated.");
-                        loadGarageData(); // Refresh JTable
+                        loadGarageData(); 
 
                     } catch (Exception ex) {
                         try { con.rollback(); } catch (Exception rex) {}
@@ -395,8 +389,6 @@ public class start extends JFrame {
         Connection con = DBcon.getConnection();
         if (con == null) return;
 
-        // We JOIN on TableId. 
-        // This pulls the FixedPrice from garagetable for every category found in categories.
         String query = "SELECT c.TableId, c.CategoryName, g.FixedPrice, g.DiscountRate, c.Stock " +
                        "FROM categories c " +
                        "INNER JOIN garagetable g ON c.TableId = g.TableId " +
@@ -410,7 +402,7 @@ public class start extends JFrame {
                     rs.getInt("TableId"),
                     rs.getString("CategoryName"),
                     rs.getInt("FixedPrice"),
-                    (int)(rs.getDouble("DiscountRate") * 100) + "%", // Format back to display as %
+                    (int)(rs.getDouble("DiscountRate") * 100) + "%", 
                     rs.getInt("Stock")
                 });
             }
