@@ -7,21 +7,19 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.border.EmptyBorder;
-import javax.swing.ImageIcon;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import javax.swing.*;
 import java.awt.event.ActionListener;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.awt.event.ActionEvent;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.DefaultComboBoxModel;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.JProgressBar;
 
@@ -42,6 +40,11 @@ public class start extends JFrame {
     private JTable TransactionTable;
     private JTextField StudentIDInput;
     private JTextField SetTicketInput;
+    private JLabel lblSoldStatus;
+    private JProgressBar soldProgressBar;
+    private JProgressBar ticketProgressBar;
+    private JLabel lblTicketStatus;
+    private JTable TicketTable;
     JComboBox TransactionCategoryComboBox; 
     JComboBox TransactionTableNumberComboBox;
 
@@ -309,6 +312,7 @@ public class start extends JFrame {
         garageContent.add(AddButton);
         
         JButton btnDeleteGarage = new JButton("Delete Selected");
+        btnDeleteGarage.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         btnDeleteGarage.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
         		removeSelectedRow();
@@ -424,10 +428,11 @@ public class start extends JFrame {
         	new Object[][] {
         	},
         	new String[] {
-        		"StudentID", "First Name", "Last Name", "Email", "TableID", "Category Name", "Quantity", "Total", "Tickets"
+        			"TransactionID", "StudentID", "TableID", "Category Name", "Quantity", "Total", "Tickets"
         	}
         ));
-        TransactionTable.getColumnModel().getColumn(5).setPreferredWidth(93);
+        TransactionTable.getColumnModel().getColumn(0).setPreferredWidth(85);
+        TransactionTable.getColumnModel().getColumn(3).setPreferredWidth(93);
         TransactionTable.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         TransactionTable.setBorder(new LineBorder(new Color(128, 0, 0), 1, true));
         TransactionScroll.setViewportView(TransactionTable);
@@ -570,6 +575,7 @@ public class start extends JFrame {
         garageContent.add(TransactionAdd);
         
         JButton btnDeleteTransaction = new JButton("Delete Selected");
+        btnDeleteTransaction.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         btnDeleteTransaction.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
         		int row = TransactionTable.getSelectedRow();
@@ -579,13 +585,14 @@ public class start extends JFrame {
                     return;
                 }
 
-                String studentId = TransactionTable.getValueAt(row, 0).toString();
-                String tableId = TransactionTable.getValueAt(row, 4).toString();
-                String category = TransactionTable.getValueAt(row, 5).toString();
+                String transId = TransactionTable.getValueAt(row, 0).toString(); 
+                String studentId = TransactionTable.getValueAt(row, 1).toString(); 
+                String tableId = TransactionTable.getValueAt(row, 2).toString();  
+                String category = TransactionTable.getValueAt(row, 3).toString();
 
                 int confirm = JOptionPane.showConfirmDialog(null, 
-                    "Delete this transaction for Student " + studentId + "?", 
-                    "Confirm Delete", JOptionPane.YES_NO_OPTION);
+                        "Delete Transaction #" + transId + " for Student " + studentId + "?", 
+                        "Confirm Delete", JOptionPane.YES_NO_OPTION);
 
                 if (confirm == JOptionPane.YES_OPTION) {
                     deleteTransaction(studentId, tableId, category);
@@ -594,6 +601,168 @@ public class start extends JFrame {
         });
         btnDeleteTransaction.setBounds(630, 496, 158, 23);
         garageContent.add(btnDeleteTransaction);
+        
+        JButton btnGenerateGarageReport = new JButton("Generate Report");
+        btnGenerateGarageReport.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+                LocalDateTime currentDateTime = LocalDateTime.now();
+                
+                DateTimeFormatter fileFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy h-mm a");
+                DateTimeFormatter contentFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy h:mm a");
+                
+                String formattedFileDate = currentDateTime.format(fileFormatter);
+                String formattedContentDate = currentDateTime.format(contentFormatter);
+
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Save Sales Report");
+                fileChooser.setSelectedFile(new File("GarageSalesReport(" + formattedFileDate + ").csv")); 
+
+                int userSelection = fileChooser.showSaveDialog(null);
+
+                if (userSelection == JFileChooser.APPROVE_OPTION) {
+                    File fileToSave = fileChooser.getSelectedFile();
+                    String filePath = fileToSave.getAbsolutePath();
+                    
+                    if (!filePath.toLowerCase().endsWith(".csv")) {
+                        filePath += ".csv";
+                    }
+
+                    if (con == null) return;
+
+                    String query = "SELECT c.TableId, c.CategoryName, g.FixedPrice, g.DiscountRate, " +
+                                   "c.Stock, IFNULL(SUM(ti.Quantity), 0) AS QuantitySold, " +
+                                   "IFNULL(SUM(ti.Total), 0) AS TotalSales " +
+                                   "FROM categories c " +
+                                   "JOIN garagetable g ON c.TableId = g.TableId " +
+                                   "LEFT JOIN transactionitems ti ON c.CategoryId = ti.CategoryId " +
+                                   "GROUP BY c.CategoryId, c.TableId, c.CategoryName, g.FixedPrice, g.DiscountRate, c.Stock " +
+                                   "ORDER BY c.TableId ASC";
+
+                    try (Statement stmt = con.createStatement();
+                         ResultSet rs = stmt.executeQuery(query);
+                         PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
+
+                        writer.println("Date Generated:," + formattedContentDate);
+                        writer.println(); 
+
+                        writer.println("Table Number,Category Name,Fixed Price,Discount Rate,Quantity,Quantity Sold");
+
+                        double grandTotalSales = 0.0;
+
+                        while (rs.next()) {
+                            int tableId = rs.getInt("TableId");
+                            String categoryName = rs.getString("CategoryName").replace(",", " "); 
+                            double price = rs.getDouble("FixedPrice");
+                            double discountRate = rs.getDouble("DiscountRate");
+                            int currentStock = rs.getInt("Stock");
+                            int quantitySold = rs.getInt("QuantitySold");
+                            double totalSales = rs.getDouble("TotalSales");
+
+                            int originalQuantity = currentStock + quantitySold;
+                            grandTotalSales += totalSales;
+
+                            writer.printf("%d,%s,%.2f,%.2f,%d,%d\n", 
+                                          tableId, categoryName, price, discountRate, originalQuantity, quantitySold);
+                        }
+
+                        writer.println(); 
+                        writer.printf(",,,,Total Amount Sold:,%.2f\n", grandTotalSales);
+
+                        JOptionPane.showMessageDialog(null, "Report successfully generated!\nSaved at: " + filePath);
+
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(null, "Error generating report: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
+
+        btnGenerateGarageReport.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnGenerateGarageReport.setBounds(498, 264, 130, 23);
+        garageContent.add(btnGenerateGarageReport);
+        
+        JButton btnGenerateTransactionReport = new JButton("Generate Report");
+        btnGenerateTransactionReport.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		LocalDateTime currentDateTime = LocalDateTime.now();
+                
+                DateTimeFormatter fileFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy h-mm a");
+                DateTimeFormatter contentFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy h:mm a");
+                
+                String formattedFileDate = currentDateTime.format(fileFormatter);
+                String formattedContentDate = currentDateTime.format(contentFormatter);
+
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Save Transaction Report");
+                fileChooser.setSelectedFile(new File("TransactionReport(" + formattedFileDate + ").csv")); 
+
+                int userSelection = fileChooser.showSaveDialog(null);
+
+                if (userSelection == JFileChooser.APPROVE_OPTION) {
+                    File fileToSave = fileChooser.getSelectedFile();
+                    String filePath = fileToSave.getAbsolutePath();
+                    
+                    if (!filePath.toLowerCase().endsWith(".csv")) {
+                        filePath += ".csv";
+                    }
+
+                    if (con == null) return;
+
+                    String query = "SELECT t.TransactionId, s.StudentId, s.FirstName, s.LastName, s.Email, " +
+                                   "ti.TableId, c.CategoryName, ti.Quantity AS QuantityBought, ti.Total, " +
+                                   "(SELECT COUNT(*) FROM tickets WHERE TransactionId = t.TransactionId) as TicketsGot " +
+                                   "FROM transactions t " +
+                                   "JOIN students s ON t.StudentId = s.StudentId " +
+                                   "JOIN transactionitems ti ON t.TransactionId = ti.TransactionId " +
+                                   "JOIN categories c ON ti.CategoryId = c.CategoryId " +
+                                   "ORDER BY t.TransactionId ASC";
+
+                    try (Statement stmt = con.createStatement();
+                         ResultSet rs = stmt.executeQuery(query);
+                         PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
+
+                        writer.println("Date Generated:," + formattedContentDate);
+                        writer.println(); 
+
+                        writer.println("TransactionID,StudentID,First Name,Last Name,Email,TableID,Category Name,Quantity Bought,Quantity of Tickets Got,Total");
+
+                        double grandTotalSales = 0.0;
+
+                        while (rs.next()) {
+                            int transId = rs.getInt("TransactionId");
+                            String studentId = rs.getString("StudentId");
+                            String fName = rs.getString("FirstName").replace(",", " ");
+                            String lName = rs.getString("LastName").replace(",", " ");
+                            String email = rs.getString("Email").replace(",", " ");
+                            
+                            int tableId = rs.getInt("TableId");
+                            String categoryName = rs.getString("CategoryName").replace(",", " "); 
+                            int quantityBought = rs.getInt("QuantityBought");
+                            int ticketsGot = rs.getInt("TicketsGot");
+                            double total = rs.getDouble("Total");
+
+                            grandTotalSales += total;
+
+                            writer.printf("%d,%s,%s,%s,%s,%d,%s,%d,%d,%.2f\n", 
+                                          transId, studentId, fName, lName, email, tableId, categoryName, quantityBought, ticketsGot, total);
+                        }
+
+                        writer.println(); 
+                        writer.printf(",,,,,,,,Grand Total:,%.2f\n", grandTotalSales);
+
+                        JOptionPane.showMessageDialog(null, "Transaction Report successfully generated!\nSaved at: " + filePath);
+
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(null, "Error generating transaction report: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
+        btnGenerateTransactionReport.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnGenerateTransactionReport.setBounds(498, 496, 130, 23);
+        garageContent.add(btnGenerateTransactionReport);
         
         loadTransactionTableData();
         
@@ -605,11 +774,37 @@ public class start extends JFrame {
         ticketLabel.setBounds(21, 11, 400, 40);
         ticketsContent.add(ticketLabel);
         contentPanel.add(ticketsContent, "TICKETS");
-        
+   
+        lblTicketStatus = new JLabel("Tickets Availability Status");
+        lblTicketStatus.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblTicketStatus.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        lblTicketStatus.setBounds(232, 270, 200, 20); 
+        ticketsContent.add(lblTicketStatus);
+
+        ticketProgressBar = new JProgressBar();
+        ticketProgressBar.setStringPainted(true); 
+        ticketProgressBar.setForeground(new Color(0, 0, 200)); 
+        ticketProgressBar.setBounds(232, 295, 200, 30);
+        ticketsContent.add(ticketProgressBar);
+
         JLabel lblSetTickets = new JLabel("Set Tickets:");
-        lblSetTickets.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        lblSetTickets.setFont(new Font("Segoe UI", Font.BOLD, 13));
         lblSetTickets.setBounds(21, 119, 110, 14);
         ticketsContent.add(lblSetTickets);
+
+        lblSoldStatus = new JLabel("Tickets Sold Status");
+        lblSoldStatus.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblSoldStatus.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        lblSoldStatus.setBounds(589, 270, 200, 20); 
+        ticketsContent.add(lblSoldStatus);
+
+        soldProgressBar = new JProgressBar();
+        soldProgressBar.setStringPainted(true);
+        soldProgressBar.setForeground(new Color(0, 128, 0)); 
+        soldProgressBar.setBounds(587, 295, 200, 30);
+        ticketsContent.add(soldProgressBar);
+
+        updateTicketStatusLabel();
         
         SetTicketInput = new JTextField();
         SetTicketInput.setBounds(106, 119, 64, 20);
@@ -620,67 +815,257 @@ public class start extends JFrame {
         btnSet.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
         		String input = SetTicketInput.getText().trim();
-                
                 if (input.isEmpty()) {
                     JOptionPane.showMessageDialog(null, "Please enter a number of tickets.");
                     return;
                 }
-
                 try {
                     int totalTickets = Integer.parseInt(input);
-                    int confirm = JOptionPane.showConfirmDialog(null, 
-                        "This will reset the ticket pool to " + totalTickets + ". Continue?", 
-                        "Reset Ticket Pool", JOptionPane.YES_NO_OPTION);
-
-                    if (confirm == JOptionPane.YES_OPTION) {
-                        initializeTicketPool(totalTickets);
-                        SetTicketInput.setText("");
-                    }
+                    initializeTicketPool(totalTickets);
+                    SetTicketInput.setText("");
+                    loadTicketData();
+                    updateTicketStatusLabel();
+                
                 } catch (NumberFormatException ex) {
                     JOptionPane.showMessageDialog(null, "Invalid input. Please enter a whole number.");
                 }
             }
         });
-        
+
         btnSet.setBounds(61, 150, 56, 23);
         ticketsContent.add(btnSet);
         
+     // ===========TICKET TABLE============= 
+
+     JScrollPane TicketScroll = new JScrollPane();
+     TicketScroll.setBounds(233, 62, 555, 204); 
+     ticketsContent.add(TicketScroll);
+     
+     TicketTable = new JTable();
+     TicketTable.setDefaultEditor(Object.class, null); 
+     TicketTable.setBorder(new LineBorder(new Color(128, 0, 0), 1, true));
+     TicketScroll.setViewportView(TicketTable);
+     TicketTable.setModel(new DefaultTableModel(
+         new Object[][] {
+         },
+         new String[] {
+             "Ticket ID", "Availability Status", "Transaction ID"
+         }
+     ));
+     TicketTable.setFont(new Font("Segoe UI", Font.PLAIN, 15));
+     
+     JButton btnGenerateTicketReport = new JButton("Generate Report");
+     btnGenerateTicketReport.addActionListener(new ActionListener() {
+     	public void actionPerformed(ActionEvent e) {
+     		LocalDateTime currentDateTime = LocalDateTime.now();
+            
+            DateTimeFormatter fileFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy h-mm a");
+            DateTimeFormatter contentFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy h:mm a");
+            
+            String formattedFileDate = currentDateTime.format(fileFormatter);
+            String formattedContentDate = currentDateTime.format(contentFormatter);
+
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Save Ticket Report");
+            fileChooser.setSelectedFile(new File("TicketReport(" + formattedFileDate + ").csv")); 
+
+            int userSelection = fileChooser.showSaveDialog(null);
+
+            if (userSelection == JFileChooser.APPROVE_OPTION) {
+                File fileToSave = fileChooser.getSelectedFile();
+                String filePath = fileToSave.getAbsolutePath();
+                
+                if (!filePath.toLowerCase().endsWith(".csv")) {
+                    filePath += ".csv";
+                }
+                if (con == null) return;
+                String query = "SELECT t.TicketId, t.availability, t.TransactionId, tr.StudentId " +
+                               "FROM tickets t " +
+                               "LEFT JOIN transactions tr ON t.TransactionId = tr.TransactionId " +
+                               "ORDER BY t.TicketId ASC";
+
+                try (Statement stmt = con.createStatement();
+                     ResultSet rs = stmt.executeQuery(query);
+                     PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
+
+                    writer.println("Date Generated:," + formattedContentDate);
+                    writer.println(); 
+                    writer.println("TicketID,Availability,TransactionID,StudentID");
+                    int availableTicketsCount = 0;
+                    while (rs.next()) {
+                        int ticketId = rs.getInt("TicketId");
+                        String availability = rs.getString("Availability");
+                        if ("1".equals(availability)) {
+                            availableTicketsCount++;
+                        }
+                        int transId = rs.getInt("TransactionId");
+                        String transIdStr = rs.wasNull() ? "" : String.valueOf(transId);
+                        String studentId = rs.getString("StudentId");
+                        if (studentId == null) {
+                            studentId = "";
+                        }
+                        writer.printf("%d,%s,%s,%s\n", 
+                                      ticketId, availability, transIdStr, studentId);
+                    }
+                    writer.println(); 
+                    writer.printf("Available tickets:,%d,,\n", availableTicketsCount);
+                    JOptionPane.showMessageDialog(null, "Ticket Report successfully generated!\nSaved at: " + filePath);
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null, "Error generating ticket report: " + ex.getMessage());
+                    ex.printStackTrace();
+                }
+            }
+        }
+    });
+     	
+     btnGenerateTicketReport.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+     btnGenerateTicketReport.setBounds(444, 336, 130, 23);
+     ticketsContent.add(btnGenerateTicketReport);
+     loadTicketData();
+
 
         // ================= NAVIGATION =================
         btnDashboard.addActionListener(e -> {
-            contentLayout.show(contentPanel, "DASHBOARD");
-            updateActive(btnDashboard, btnGarage, btnTickets);
+        contentLayout.show(contentPanel, "DASHBOARD");
+        updateActive(btnDashboard, btnGarage, btnTickets);
         });
-
+        
         btnGarage.addActionListener(e -> {
-            contentLayout.show(contentPanel, "GARAGE");
-            updateActive(btnGarage, btnDashboard, btnTickets);
+        contentLayout.show(contentPanel, "GARAGE");
+        updateActive(btnGarage, btnDashboard, btnTickets);
         });
 
         btnTickets.addActionListener(e -> {
-            contentLayout.show(contentPanel, "TICKETS");
-            updateActive(btnTickets, btnDashboard, btnGarage);
+        contentLayout.show(contentPanel, "TICKETS");
+        updateActive(btnTickets, btnDashboard, btnGarage);
+        loadTicketData();
+        updateTicketStatusLabel();
         });
-    }
-    
-    //=============METHODSSSSSSSSSS====================
-    
-    private void initializeTicketPool(int totalTickets) {
+
+        }
+
+        //=============METHODSSSSSSSSSS====================
+    private void initializeTicketPool(int targetTotalTickets) {
         Connection con = DBcon.getConnection();
         if (con == null) return;
-        
+
         try {
-            String sql = "INSERT IGNORE INTO tickets (TicketId, TransactionId, availability) VALUES (?, NULL, 1)";
-            java.sql.PreparedStatement pstmt = con.prepareStatement(sql);
+            int currentMaxId = 0;
+            String checkSql = "SELECT MAX(TicketId) FROM tickets";
+            PreparedStatement checkStmt = con.prepareStatement(checkSql);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next()) {
+                currentMaxId = rs.getInt(1);
+            }
+            rs.close();
+            checkStmt.close();
+
+            if (targetTotalTickets < currentMaxId) {
+                int confirmDecrease = JOptionPane.showConfirmDialog(null,
+                    "This will DECREASE the pool and delete the highest " + (currentMaxId - targetTotalTickets) + " tickets. Continue?",
+                    "Decrease Ticket Pool", JOptionPane.YES_NO_OPTION);
+                if (confirmDecrease == JOptionPane.YES_OPTION) {
+                    String deleteSql = "DELETE FROM tickets WHERE TicketId > ?";
+                    PreparedStatement delStmt = con.prepareStatement(deleteSql);
+                    delStmt.setInt(1, targetTotalTickets);
+                    
+                    int rowsDeleted = delStmt.executeUpdate();
+                    JOptionPane.showMessageDialog(null, "Successfully removed " + rowsDeleted + " tickets.");
+                    delStmt.close();
+                }
+                return; 
+            } 
+            else if (targetTotalTickets == currentMaxId) {
+                 JOptionPane.showMessageDialog(null, "The pool is already exactly " + targetTotalTickets + " tickets.");
+                 return;
+            }
+            int ticketsToAdd = targetTotalTickets - currentMaxId;
+            String insertSql = "INSERT INTO tickets (TicketId, TransactionId, availability) VALUES (?, NULL, 1)";
+            PreparedStatement pstmt = con.prepareStatement(insertSql);
             
-            for (int i = 1; i <= totalTickets; i++) {
+            for (int i = currentMaxId + 1; i <= targetTotalTickets; i++) {
                 pstmt.setInt(1, i);
                 pstmt.addBatch();
             }
+            
             pstmt.executeBatch();
-            JOptionPane.showMessageDialog(null, totalTickets + " Tickets initialized and available.");
+            JOptionPane.showMessageDialog(null, "Successfully added " + ticketsToAdd + " new tickets! The total capacity is now " + targetTotalTickets + ".");
+            pstmt.close();
+
         } catch (Exception e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database Error: Cannot delete tickets that are already tied to a transaction.");
+        }
+    }
+    
+    private void updateTicketStatusLabel() {
+        Connection con = DBcon.getConnection();
+        if (con == null) return;
+
+        try {
+            int total = 0;
+            int available = 0;
+            
+            String sqlTotal = "SELECT COUNT(*) FROM tickets";
+            PreparedStatement pstmtTotal = con.prepareStatement(sqlTotal);
+            ResultSet rsTotal = pstmtTotal.executeQuery();
+            if (rsTotal.next()) total = rsTotal.getInt(1);
+
+            String sqlAvail = "SELECT COUNT(*) FROM tickets WHERE availability = 1";
+            PreparedStatement pstmtAvail = con.prepareStatement(sqlAvail);
+            ResultSet rsAvail = pstmtAvail.executeQuery();
+            if (rsAvail.next()) available = rsAvail.getInt(1);
+
+            ticketProgressBar.setMinimum(0);
+            ticketProgressBar.setMaximum(total);
+            ticketProgressBar.setValue(available);
+            ticketProgressBar.setString(available + " / " + total + " Available");
+            
+         int soldCount = total - available;
+
+         soldProgressBar.setMinimum(0);
+         soldProgressBar.setMaximum(total);
+         soldProgressBar.setValue(soldCount);
+         soldProgressBar.setString(soldCount + " / " + total + " Sold");
+         
+            rsTotal.close();
+            pstmtTotal.close();
+            rsAvail.close();
+            pstmtAvail.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void loadTicketData() {
+        // Get the model so we can add rows to it
+        DefaultTableModel model = (DefaultTableModel) TicketTable.getModel();
+        model.setRowCount(0); 
+        Connection con = DBcon.getConnection();
+        if (con == null) return;
+
+        try {
+            String sql = "SELECT TicketId, availability, TransactionId FROM tickets";
+            PreparedStatement pstmt = con.prepareStatement(sql);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                String ticketId = rs.getString("TicketId");
+                int avail = rs.getInt("availability");
+                String status = (avail == 1) ? "Available" : "Sold";
+                String transId = rs.getString("TransactionId");
+                if (rs.wasNull()) {
+                    transId = "-"; 
+                }
+                model.addRow(new Object[]{ticketId, status, transId});
+            }
+            rs.close();
+            pstmt.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Error loading ticket data: " + e.getMessage());
         }
     }
     
@@ -764,27 +1149,26 @@ public class start extends JFrame {
         Connection con = DBcon.getConnection();
         if (con == null) return;
 
-        String query = "SELECT s.StudentId, s.FirstName, s.LastName, s.Email, ti.TableId, c.CategoryName, ti.Quantity, ti.Total, " +
-                       "(SELECT COUNT(*) FROM tickets WHERE TransactionId = t.TransactionId) as TicketCount " +
-                       "FROM transactionitems ti " +
-                       "JOIN transactions t ON ti.TransactionId = t.TransactionId " +
-                       "JOIN students s ON t.StudentId = s.StudentId " +
-                       "JOIN categories c ON ti.CategoryId = c.CategoryId";
+        String query = "SELECT t.TransactionId, s.StudentId, " +
+                "ti.TableId, c.CategoryName, ti.Quantity, ti.Total, " +
+                "(SELECT COUNT(*) FROM tickets WHERE TransactionId = t.TransactionId) as TicketCount " +
+                "FROM transactionitems ti " +
+                "JOIN transactions t ON ti.TransactionId = t.TransactionId " +
+                "JOIN students s ON t.StudentId = s.StudentId " +
+                "JOIN categories c ON ti.CategoryId = c.CategoryId";
 
         try (java.sql.Statement stmt = con.createStatement();
              java.sql.ResultSet rs = stmt.executeQuery(query)) {
 
-            while (rs.next()) {
+        	while (rs.next()) {
                 model.addRow(new Object[]{
-                    rs.getString("StudentId"),
-                    rs.getString("FirstName"),
-                    rs.getString("LastName"),
-                    rs.getString("Email"),
-                    rs.getInt("TableId"),
+                    rs.getInt("TransactionId"), 
+                    rs.getString("StudentId"),   
+                    rs.getInt("TableId"),        
                     rs.getString("CategoryName"),
-                    rs.getInt("Quantity"),
-                    rs.getDouble("Total"),
-                    rs.getInt("TicketCount")
+                    rs.getInt("Quantity"),      
+                    rs.getDouble("Total"),      
+                    rs.getInt("TicketCount")     
                 });
             }
         } catch (Exception e) {
