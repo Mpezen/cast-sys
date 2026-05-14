@@ -7,7 +7,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import javax.swing.*;
@@ -16,12 +15,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.awt.event.ActionEvent;
-import javax.swing.JTable;
+
 import javax.swing.table.DefaultTableModel;
-import javax.swing.DefaultComboBoxModel;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
-import javax.swing.JProgressBar;
+import javax.swing.plaf.metal.MetalButtonUI;
 
 public class start extends JFrame {
 
@@ -45,12 +43,15 @@ public class start extends JFrame {
     private JProgressBar ticketProgressBar;
     private JLabel lblTicketStatus;
     private JTable TicketTable;
+    private JLabel lblSold;
+    private JLabel lblRemaining;
+    private JProgressBar progressBarTicket;
+    private double currentProfitGoal = 0.0;
     JComboBox TransactionCategoryComboBox; 
     JComboBox TransactionTableNumberComboBox;
+    private JTable table;
 
     public static void main(String[] args) {
-    	
-    	Connection con = DBcon.getConnection();
     	
         EventQueue.invokeLater(() -> {
             try {
@@ -64,45 +65,56 @@ public class start extends JFrame {
 
     public start() {
     	Connection con = DBcon.getConnection();
-    	
+    
         setResizable(false);
         setTitle("CAST-SYS");
         setIconImage(new ImageIcon("logocast.png").getImage());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setBounds(100, 100, 1030, 600);
+        setBounds(100, 100, 1030, 592);
 
         contentPane = new JPanel();
         contentPane.setBorder(new EmptyBorder(0, 0, 0, 0));
         contentPane.setLayout(null);
         setContentPane(contentPane);
+        
 
         // ================= SIDEBAR =================
         JPanel sidebar = new JPanel();
         sidebar.setLayout(null);
         sidebar.setBackground(new Color(185, 11, 41));
-        sidebar.setBounds(0, 0, 188, 561);
+        sidebar.setBounds(0, 0, 186, 561);
         contentPane.add(sidebar);
 
-        JLabel title = new JLabel("CAST-SYS");
-        title.setForeground(Color.WHITE);
-        title.setFont(new Font("Verdana", Font.BOLD, 21));
-        title.setBounds(21, 54, 139, 40);
-        sidebar.add(title);
-
         JButton btnDashboard = new JButton("Dashboard");
-        btnDashboard.setBounds(10, 149, 173, 34);
-        styleNavButton(btnDashboard, true);
+        btnDashboard.setForeground(new Color(255, 255, 255));
+        btnDashboard.setBackground(new Color(128, 0, 0));
+        btnDashboard.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        btnDashboard.setBounds(26, 149, 133, 34);
+        
         sidebar.add(btnDashboard);
 
         JButton btnGarage = new JButton("Garage");
-        btnGarage.setBounds(10, 214, 173, 34);
-        styleNavButton(btnGarage, false);
+        btnGarage.setBackground(new Color(128, 0, 0));
+        btnGarage.setForeground(new Color(255, 255, 255));
+        btnGarage.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        btnGarage.setBounds(26, 214, 133, 34);
+        
         sidebar.add(btnGarage);
 
         JButton btnTickets = new JButton("Tickets");
-        btnTickets.setBounds(10, 279, 173, 34);
-        styleNavButton(btnTickets, false);
+        btnTickets.setBackground(new Color(128, 0, 0));
+        btnTickets.setForeground(new Color(255, 255, 255));
+        btnTickets.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        btnTickets.setBounds(26, 279, 133, 34);
+        
         sidebar.add(btnTickets);
+        
+                JLabel title = new JLabel("");
+                title.setIcon(new ImageIcon("D:\\zencode\\java\\cast-sys\\castdesign_8_200x563.png"));
+                title.setBounds(0, -31, 203, 619);
+                sidebar.add(title);
+                title.setForeground(Color.WHITE);
+                title.setFont(new Font("Verdana", Font.BOLD, 21));
 
         // ================= WHOLE CONTENT =================
         contentPanel = new JPanel();
@@ -121,15 +133,190 @@ public class start extends JFrame {
         
         JLabel lblProfitGoal = new JLabel("Profit Goal");
         lblProfitGoal.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        lblProfitGoal.setBounds(20, 58, 136, 40);
+        lblProfitGoal.setBounds(58, 106, 136, 40);
         dashboardContent.add(lblProfitGoal);
         
         JProgressBar progressBar = new JProgressBar();
         progressBar.setStringPainted(true);
         progressBar.setForeground(new Color(255, 0, 0));
         progressBar.setValue(67);
-        progressBar.setBounds(20, 97, 263, 27);
+        progressBar.setBounds(58, 145, 263, 27);
         dashboardContent.add(progressBar);
+        
+        JLabel lblProgress = new JLabel("0 / 0");
+        lblProgress.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        lblProgress.setBounds(68, 183, 165, 14);
+        dashboardContent.add(lblProgress);
+        
+        JButton btnGoal = new JButton("Edit Goal");
+        btnGoal.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		
+        		String goal = JOptionPane.showInputDialog(null, "Edit Goal", "Edit Goal", JOptionPane.PLAIN_MESSAGE);
+        		
+        		if (goal != null && !goal.trim().isEmpty()) {
+                    try {
+                        currentProfitGoal = Double.parseDouble(goal);
+                        updateProfitGoalDisplay(progressBar, lblProgress);
+                        
+                    } catch (NumberFormatException ex) {
+                        JOptionPane.showMessageDialog(null, "Invalid input. Please enter a valid number.", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }
+        });
+        btnGoal.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnGoal.setBounds(144, 205, 89, 23);
+        dashboardContent.add(btnGoal);
+        
+        updateProfitGoalDisplay(progressBar, lblProgress);
+        
+        JLabel lblTickets = new JLabel("Tickets");
+        lblTickets.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        lblTickets.setBounds(58, 294, 136, 40);
+        dashboardContent.add(lblTickets);
+        
+        lblSold = new JLabel("SOLD:");
+        lblSold.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        lblSold.setBounds(58, 334, 73, 19);
+        dashboardContent.add(lblSold);
+        
+        lblRemaining = new JLabel("REMAINING:");
+        lblRemaining.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        lblRemaining.setBounds(171, 334, 103, 19);
+        dashboardContent.add(lblRemaining);
+        
+        progressBarTicket = new JProgressBar();
+        progressBarTicket.setValue(67);
+        progressBarTicket.setStringPainted(true);
+        progressBarTicket.setString("");
+        progressBarTicket.setMaximum(0);
+        progressBarTicket.setForeground(new Color(255, 255, 0));
+        progressBarTicket.setBounds(58, 360, 263, 27);
+        dashboardContent.add(progressBarTicket);
+        
+        updateDashboardTicketsDisplay(lblSold, lblRemaining, progressBarTicket);
+        
+        JSeparator separator = new JSeparator();
+        separator.setBounds(45, 257, 310, 14);
+        dashboardContent.add(separator);
+        
+        JScrollPane dashboardgarage = new JScrollPane();
+        dashboardgarage.setBounds(375, 89, 422, 388);
+        dashboardContent.add(dashboardgarage);
+        
+        table = new JTable();
+        table.setRowSelectionAllowed(false);
+        table.setModel(new DefaultTableModel(
+        	new Object[][] {
+        	},
+        	new String[] {
+        		"Table", "Category", "Price", "Sold", "Stock", "Total"
+        	} 
+        ));
+        table.getColumnModel().getColumn(0).setPreferredWidth(39);
+        table.getColumnModel().getColumn(1).setPreferredWidth(79);
+        table.getColumnModel().getColumn(2).setPreferredWidth(37);
+        table.getColumnModel().getColumn(3).setPreferredWidth(41);
+        table.getColumnModel().getColumn(4).setPreferredWidth(40);
+        table.getColumnModel().getColumn(5).setPreferredWidth(46);
+        dashboardgarage.setViewportView(table);
+        
+        JButton btnGenerateDashboard = new JButton("Generate Report");
+        btnGenerateDashboard.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                LocalDateTime now = LocalDateTime.now();
+                DateTimeFormatter fileDate = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm");
+                DateTimeFormatter displayDate = DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm:ss");
+
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Save Dashboard Report");
+                fileChooser.setSelectedFile(new File("Dashboard_Summary_" + now.format(fileDate) + ".csv"));
+
+                if (fileChooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    File file = fileChooser.getSelectedFile();
+                    String path = file.getAbsolutePath();
+                    if (!path.toLowerCase().endsWith(".csv")) path += ".csv";
+
+                    Connection con = DBcon.getConnection();
+                    if (con == null) return;
+
+                    try (PrintWriter writer = new PrintWriter(new FileWriter(path))) {
+                        writer.println("DASHBOARD REPORT");
+                        writer.println("Generated on:," + now.format(displayDate));
+                        writer.println();
+
+                        double totalSales = 0;
+                        String sqlProfit = "SELECT SUM(Total) FROM transactionitems";
+                        try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sqlProfit)) {
+                            if (rs.next()) totalSales = rs.getDouble(1);
+                        }
+                        
+                        writer.println("PROFIT GOAL");
+                        writer.println("Current Total Sales:," + String.format("%.2f", totalSales));
+                        writer.println("Target Profit Goal:," + String.format("%.2f", currentProfitGoal));
+                        double progress = (totalSales / (currentProfitGoal > 0 ? currentProfitGoal : 1)) * 100;
+                        writer.println("Goal Progress:," + String.format("%.2f", progress) + "%");
+                        writer.println();
+
+                        int tTotal = 0, tAvail = 0;
+                        String sqlTix = "SELECT COUNT(*) as total, SUM(CASE WHEN availability = 1 THEN 1 ELSE 0 END) as avail FROM tickets";
+                        try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sqlTix)) {
+                            if (rs.next()) {
+                                tTotal = rs.getInt("total");
+                                tAvail = rs.getInt("avail");
+                            }
+                        }
+                        int tSold = tTotal - tAvail;
+                        
+                        writer.println("TICKETS");
+                        writer.println("Total Tickets:,Sold,Remaining,Sold %");
+                        double tPercent = (tTotal > 0) ? ((double)tSold / tTotal) * 100 : 0;
+                        writer.println(tTotal + "," + tSold + "," + tAvail + "," + String.format("%.2f", tPercent) + "%");
+                        writer.println();
+
+                        writer.println("3. GARAGE TABLE");
+                        writer.println("Table Number,Category,Fixed Price,Units Sold,Current Stock,Total Revenue");
+
+                        String sqlGarage = "SELECT c.TableId, c.CategoryName, g.FixedPrice, " +
+                                           "IFNULL(SUM(ti.Quantity), 0) AS SoldCount, " +
+                                           "c.Stock, IFNULL(SUM(ti.Total), 0) AS Revenue " +
+                                           "FROM categories c " +
+                                           "JOIN garagetable g ON c.TableId = g.TableId " +
+                                           "LEFT JOIN transactionitems ti ON c.CategoryId = ti.CategoryId " +
+                                           "GROUP BY c.CategoryId, c.TableId, c.CategoryName, g.FixedPrice, c.Stock " +
+                                           "ORDER BY c.TableId ASC";
+
+                        try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sqlGarage)) {
+                            while (rs.next()) {
+                                writer.println(
+                                    rs.getInt("TableId") + "," +
+                                    rs.getString("CategoryName").replace(",", " ") + "," +
+                                    rs.getDouble("FixedPrice") + "," +
+                                    rs.getInt("SoldCount") + "," +
+                                    rs.getInt("Stock") + "," +
+                                    rs.getDouble("Revenue")
+                                );
+                            }
+                        }
+
+                        JOptionPane.showMessageDialog(null, "Dashboard Report Generated Successfully.\n" + path);
+
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(null, "Error generating report: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
+        btnGenerateDashboard.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        btnGenerateDashboard.setBounds(45, 509, 136, 23);
+        dashboardContent.add(btnGenerateDashboard);
+        
+        JLabel lblGarageSale = new JLabel("Garage Sale");
+        lblGarageSale.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        lblGarageSale.setBounds(375, 46, 136, 40);
+        dashboardContent.add(lblGarageSale);
         
         
         if(con != null)
@@ -243,8 +430,8 @@ public class start extends JFrame {
         JButton AddButton = new JButton("Update");
         AddButton.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         AddButton.addActionListener(new ActionListener() {
-        	public void actionPerformed(ActionEvent e) {
-        		Object selectedTable = comboBoxTableNumber.getSelectedItem();
+            public void actionPerformed(ActionEvent e) {
+                Object selectedTable = comboBoxTableNumber.getSelectedItem();
                 if (selectedTable == null) {
                     JOptionPane.showMessageDialog(null, "Please select a Table Number first.");
                     return;
@@ -261,18 +448,16 @@ public class start extends JFrame {
                 Connection con = DBcon.getConnection();
                 if (con != null) {
                     try {
-                        con.setAutoCommit(false);
                         String sqlGarage = "INSERT INTO garagetable (TableId, FixedPrice, DiscountRate) " +
                                            "VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE " +
                                            "FixedPrice = IF(VALUES(FixedPrice) = 0, FixedPrice, VALUES(FixedPrice)), " +
                                            "DiscountRate = VALUES(DiscountRate)";
                         
-                        try (java.sql.PreparedStatement psGarage = con.prepareStatement(sqlGarage)) {
+                        try (PreparedStatement psGarage = con.prepareStatement(sqlGarage)) {
                             psGarage.setInt(1, Integer.parseInt(tableIdStr));
-                          
                             psGarage.setInt(2, fixedPriceStr.isEmpty() ? 0 : Integer.parseInt(fixedPriceStr));
                             psGarage.setDouble(3, discountRate);
-                            psGarage.executeUpdate();
+                            psGarage.executeUpdate(); // This saves instantly now
                         }
 
                         if (!categoryName.isEmpty()) {
@@ -280,16 +465,16 @@ public class start extends JFrame {
                                                  "VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE " +
                                                  "Stock = VALUES(Stock)";
                             
-                            try (java.sql.PreparedStatement psCat = con.prepareStatement(sqlCategory)) {
+                            try (PreparedStatement psCat = con.prepareStatement(sqlCategory)) {
                                 psCat.setInt(1, Integer.parseInt(tableIdStr));
                                 psCat.setString(2, categoryName);
                                 psCat.setInt(3, stockStr.isEmpty() ? 0 : Integer.parseInt(stockStr));
-                                psCat.executeUpdate();
+                                psCat.executeUpdate(); // This also saves instantly
                             }
                         }
 
-                        con.commit();
                         JOptionPane.showMessageDialog(null, "Table " + tableIdStr + " settings updated.");
+                        
                         loadGarageData(); 
                         
                         if (TransactionTableNumberComboBox != null) { 
@@ -300,11 +485,12 @@ public class start extends JFrame {
                         }
 
                     } catch (Exception ex) {
-                        try { con.rollback(); } catch (Exception rex) {}
                         JOptionPane.showMessageDialog(null, "Error: " + ex.getMessage());
                         ex.printStackTrace();
                     }
                 }
+                updateDashboardTicketsDisplay(lblSold, lblRemaining, progressBarTicket);
+                updateDashboardGarageTable();
             }
         });
         
@@ -322,6 +508,7 @@ public class start extends JFrame {
         		        updateTransactionCategories(selectedTransTable.toString(), TransactionCategoryComboBox);
         		    }
         		}
+        		updateDashboardTicketsDisplay(lblSold, lblRemaining, progressBarTicket);
         	}
         });
         btnDeleteGarage.setBounds(630, 264, 158, 23);
@@ -467,53 +654,52 @@ public class start extends JFrame {
                 Connection con = DBcon.getConnection();
                 if (con != null) {
                     try {
-                        con.setAutoCommit(false); // START TRANSACTION
-
                         if (ticketQty > 0) {
                             String sqlCheckTickets = "SELECT COUNT(*) FROM tickets WHERE availability = 1";
-                            java.sql.Statement st = con.createStatement();
-                            java.sql.ResultSet rsTix = st.executeQuery(sqlCheckTickets);
+                            Statement st = con.createStatement();
+                            ResultSet rsTix = st.executeQuery(sqlCheckTickets);
                             rsTix.next();
                             int availableTix = rsTix.getInt(1);
 
                             if (availableTix < ticketQty) {
                                 JOptionPane.showMessageDialog(null, "Not enough tickets left! Available: " + availableTix);
-                                con.rollback();
                                 return;
                             }
                         }
 
                         int currentStock = 0;
                         int catId = 0;
-                        double price = 0;
+                        double originalPrice = 0;
+                        double discountRate = 0;
                         
-                        String sqlCheck = "SELECT c.CategoryId, c.Stock, g.FixedPrice FROM categories c " +
+                        String sqlCheck = "SELECT c.CategoryId, c.Stock, g.FixedPrice, g.DiscountRate FROM categories c " +
                                           "JOIN garagetable g ON c.TableId = g.TableId " +
                                           "WHERE c.TableId = ? AND c.CategoryName = ?";
                         
-                        java.sql.PreparedStatement psCheck = con.prepareStatement(sqlCheck);
+                        PreparedStatement psCheck = con.prepareStatement(sqlCheck);
                         psCheck.setInt(1, Integer.parseInt(tId));
                         psCheck.setString(2, catName);
-                        java.sql.ResultSet rsCheck = psCheck.executeQuery();
+                        ResultSet rsCheck = psCheck.executeQuery();
 
                         if (rsCheck.next()) {
                             catId = rsCheck.getInt("CategoryId");
                             currentStock = rsCheck.getInt("Stock");
-                            price = rsCheck.getDouble("FixedPrice");
+                            originalPrice = rsCheck.getDouble("FixedPrice");
+                            discountRate = rsCheck.getDouble("DiscountRate");
                         } else {
-                            throw new Exception("Category not found in inventory.");
+                            JOptionPane.showMessageDialog(null, "Category not found.");
+                            return;
                         }
 
                         if (currentStock < requestedQty) {
                             JOptionPane.showMessageDialog(null, "Insufficient Stock! Available: " + currentStock);
-                            con.rollback();
                             return;
                         }
-
+                        
                         String sqlStudent = "INSERT INTO students (StudentId, Email, FirstName, LastName) " +
                                             "VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE " +
                                             "Email=VALUES(Email), FirstName=VALUES(FirstName), LastName=VALUES(LastName)";
-                        java.sql.PreparedStatement psStud = con.prepareStatement(sqlStudent);
+                        PreparedStatement psStud = con.prepareStatement(sqlStudent);
                         psStud.setString(1, sId);
                         psStud.setString(2, email);
                         psStud.setString(3, fName);
@@ -521,7 +707,7 @@ public class start extends JFrame {
                         psStud.executeUpdate();
 
                         String sqlTrans = "INSERT INTO transactions (StudentId) VALUES (?)";
-                        java.sql.PreparedStatement psTrans = con.prepareStatement(sqlTrans, java.sql.Statement.RETURN_GENERATED_KEYS);
+                        PreparedStatement psTrans = con.prepareStatement(sqlTrans, Statement.RETURN_GENERATED_KEYS);
                         psTrans.setString(1, sId);
                         psTrans.executeUpdate();
                         java.sql.ResultSet rsKey = psTrans.getGeneratedKeys();
@@ -530,16 +716,18 @@ public class start extends JFrame {
                         if (ticketQty > 0 && genTransId > 0) {
                             String sqlClaimTickets = "UPDATE tickets SET TransactionId = ?, availability = 0 " +
                                                      "WHERE availability = 1 LIMIT ?";
-                            java.sql.PreparedStatement psTix = con.prepareStatement(sqlClaimTickets);
+                            PreparedStatement psTix = con.prepareStatement(sqlClaimTickets);
                             psTix.setInt(1, genTransId);
                             psTix.setInt(2, ticketQty);
                             psTix.executeUpdate();
                         }
 
-                        double total = requestedQty * price;
+                        double actualPricePerItem = originalPrice * (1.0 - discountRate);
+                        double total = requestedQty * actualPricePerItem;
+
                         String sqlItem = "INSERT INTO transactionitems (TransactionId, CategoryId, TableId, Quantity, Total) " +
                                          "VALUES (?, ?, ?, ?, ?)";
-                        java.sql.PreparedStatement psItem = con.prepareStatement(sqlItem);
+                        PreparedStatement psItem = con.prepareStatement(sqlItem);
                         psItem.setInt(1, genTransId);
                         psItem.setInt(2, catId);
                         psItem.setInt(3, Integer.parseInt(tId));
@@ -553,20 +741,18 @@ public class start extends JFrame {
                         psUpdate.setInt(2, catId);
                         psUpdate.executeUpdate();
 
-                        con.commit();
-                        JOptionPane.showMessageDialog(null, "Transaction successful! Tickets and Stock updated.");
+                        JOptionPane.showMessageDialog(null, "Transaction successful!");
 
                         loadTransactionTableData(); 
-                        loadGarageData();           
+                        loadGarageData();
+                        updateDashboardTicketsDisplay(lblSold, lblRemaining, progressBarTicket);
                        
                     } catch (Exception ex) {
-                        try { con.rollback(); } catch (Exception ignore) {}
-                        JOptionPane.showMessageDialog(null, "Transaction Failed: " + ex.getMessage());
+                        JOptionPane.showMessageDialog(null, "Error: " + ex.getMessage());
                         ex.printStackTrace();
-                    } finally {
-                        try { con.setAutoCommit(true); } catch (Exception ignore) {}
                     }
                 }
+                updateDashboardGarageTable();
             }
         });
 
@@ -597,6 +783,8 @@ public class start extends JFrame {
                 if (confirm == JOptionPane.YES_OPTION) {
                     deleteTransaction(studentId, tableId, category);
                 }
+                updateDashboardTicketsDisplay(lblSold, lblRemaining, progressBarTicket);
+                updateDashboardGarageTable();
         	}
         });
         btnDeleteTransaction.setBounds(630, 496, 158, 23);
@@ -927,24 +1115,150 @@ public class start extends JFrame {
         // ================= NAVIGATION =================
         btnDashboard.addActionListener(e -> {
         contentLayout.show(contentPanel, "DASHBOARD");
-        updateActive(btnDashboard, btnGarage, btnTickets);
         });
         
         btnGarage.addActionListener(e -> {
         contentLayout.show(contentPanel, "GARAGE");
-        updateActive(btnGarage, btnDashboard, btnTickets);
+        
         });
 
         btnTickets.addActionListener(e -> {
         contentLayout.show(contentPanel, "TICKETS");
-        updateActive(btnTickets, btnDashboard, btnGarage);
+        
         loadTicketData();
         updateTicketStatusLabel();
         });
-
+        updateDashboardGarageTable();
         }
 
         //=============METHODSSSSSSSSSS====================
+    
+    private void updateDashboardGarageTable() {
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        model.setRowCount(0); // Clear existing data
+
+        Connection con = DBcon.getConnection();
+        if (con == null) return;
+
+        // This query gets: TableId, Category, Price, Count of Sales, Current Stock, and Sum of Total
+        String query = "SELECT c.TableId, c.CategoryName, g.FixedPrice, " +
+                       "IFNULL(SUM(ti.Quantity), 0) AS SoldCount, " +
+                       "c.Stock, " +
+                       "IFNULL(SUM(ti.Total), 0) AS TotalRevenue " +
+                       "FROM categories c " +
+                       "JOIN garagetable g ON c.TableId = g.TableId " +
+                       "LEFT JOIN transactionitems ti ON c.CategoryId = ti.CategoryId " +
+                       "GROUP BY c.CategoryId, c.TableId, c.CategoryName, g.FixedPrice, c.Stock " +
+                       "ORDER BY c.TableId ASC";
+
+        try (Statement stmt = con.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                model.addRow(new Object[]{
+                    rs.getInt("TableId"),
+                    rs.getString("CategoryName"),
+                    rs.getDouble("FixedPrice"),
+                    rs.getInt("SoldCount"),
+                    rs.getInt("Stock"),
+                    rs.getDouble("TotalRevenue")
+                });
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void updateDashboardTicketsDisplay(JLabel soldLabel, JLabel remainingLabel, JProgressBar ticketProgBar) {
+        Connection con = DBcon.getConnection();
+        if (con == null) return;
+
+        int total = 0;
+        int available = 0;
+
+        try {
+            // 1. Get total tickets
+            String sqlTotal = "SELECT COUNT(*) FROM tickets";
+            PreparedStatement pstmtTotal = con.prepareStatement(sqlTotal);
+            ResultSet rsTotal = pstmtTotal.executeQuery();
+            if (rsTotal.next()) total = rsTotal.getInt(1);
+
+            // 2. Get remaining (available) tickets
+            String sqlAvail = "SELECT COUNT(*) FROM tickets WHERE availability = 1";
+            PreparedStatement pstmtAvail = con.prepareStatement(sqlAvail);
+            ResultSet rsAvail = pstmtAvail.executeQuery();
+            if (rsAvail.next()) available = rsAvail.getInt(1);
+
+            rsTotal.close();
+            pstmtTotal.close();
+            rsAvail.close();
+            pstmtAvail.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        int sold = total - available;
+
+        soldLabel.setText("SOLD: " + sold);
+        remainingLabel.setText("REMAINING: " + available);
+
+        if (total > 0) {
+            ticketProgBar.setMaximum(total);
+            ticketProgBar.setValue(sold);
+            
+            int percentComplete = (int) (((double) sold / total) * 100);
+            ticketProgBar.setString(percentComplete + "% Sold");
+        } else {
+            ticketProgBar.setMaximum(1);
+            ticketProgBar.setValue(0);
+            ticketProgBar.setString("0% Sold");
+        }
+    }
+    
+    
+    private double fetchTotalSales() {
+        double totalSales = 0.0;
+        Connection con = DBcon.getConnection();
+        if (con == null) return totalSales;
+
+        try {
+            // Assuming your totals are stored in the 'transactionitems' table under 'Total'
+            // If it's in the 'transactions' table, change 'transactionitems' to 'transactions'
+            String sql = "SELECT SUM(Total) FROM transactionitems";
+            PreparedStatement pstmt = con.prepareStatement(sql);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                totalSales = rs.getDouble(1);
+            }
+
+            rs.close();
+            pstmt.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return totalSales;
+    }
+
+    private void updateProfitGoalDisplay(JProgressBar progBar, JLabel statusLabel) {
+        double currentTotal = fetchTotalSales();
+
+        if (currentProfitGoal <= 0) {
+            currentProfitGoal = 1000; 
+        }
+        int percentComplete = (int) ((currentTotal / currentProfitGoal) * 100);
+        if (percentComplete > 100) percentComplete = 100; 
+
+        progBar.setMaximum((int) currentProfitGoal);
+        progBar.setValue((int) currentTotal);
+        progBar.setString(percentComplete + "%");
+
+        statusLabel.setText(String.format("₱%.2f / ₱%.2f", currentTotal, currentProfitGoal));
+    }
+    
+    
     private void initializeTicketPool(int targetTotalTickets) {
         Connection con = DBcon.getConnection();
         if (con == null) return;
@@ -1039,7 +1353,6 @@ public class start extends JFrame {
     }
     
     private void loadTicketData() {
-        // Get the model so we can add rows to it
         DefaultTableModel model = (DefaultTableModel) TicketTable.getModel();
         model.setRowCount(0); 
         Connection con = DBcon.getConnection();
@@ -1069,13 +1382,11 @@ public class start extends JFrame {
         }
     }
     
-    private void deleteTransaction(String studentId, String tableId, String categoryName) {
+    public void deleteTransaction(String studentId, String tableId, String categoryName) {
         Connection con = DBcon.getConnection();
         if (con == null) return;
 
         try {
-            con.setAutoCommit(false); 
-
             String findDataQuery = "SELECT ti.TransactionId, ti.TransactionItemsId, ti.CategoryId, ti.Quantity " +
                                    "FROM transactionitems ti " +
                                    "JOIN transactions t ON ti.TransactionId = t.TransactionId " +
@@ -1087,11 +1398,11 @@ public class start extends JFrame {
             int catId = -1;
             int qtyToReturn = 0;
             
-            try (java.sql.PreparedStatement psFind = con.prepareStatement(findDataQuery)) {
+            try (PreparedStatement psFind = con.prepareStatement(findDataQuery)) {
                 psFind.setString(1, studentId);
                 psFind.setInt(2, Integer.parseInt(tableId));
                 psFind.setString(3, categoryName);
-                java.sql.ResultSet rs = psFind.executeQuery();
+                ResultSet rs = psFind.executeQuery();
                 if (rs.next()) {
                     transId = rs.getInt("TransactionId");
                     itemId = rs.getInt("TransactionItemsId");
@@ -1100,46 +1411,41 @@ public class start extends JFrame {
                 }
             }
 
+            
             if (transId != -1) {
+                
                 String releaseTickets = "UPDATE tickets SET TransactionId = NULL, availability = 1 WHERE TransactionId = ?";
-                try (java.sql.PreparedStatement psRelease = con.prepareStatement(releaseTickets)) {
+                try (PreparedStatement psRelease = con.prepareStatement(releaseTickets)) {
                     psRelease.setInt(1, transId);
                     psRelease.executeUpdate();
                 }
 
                 String restoreStock = "UPDATE categories SET Stock = Stock + ? WHERE CategoryId = ?";
-                try (java.sql.PreparedStatement psRestore = con.prepareStatement(restoreStock)) {
+                try (PreparedStatement psRestore = con.prepareStatement(restoreStock)) {
                     psRestore.setInt(1, qtyToReturn);
                     psRestore.setInt(2, catId);
                     psRestore.executeUpdate();
                 }
-
                 String delItems = "DELETE FROM transactionitems WHERE TransactionItemsId = ?";
-                try (java.sql.PreparedStatement ps1 = con.prepareStatement(delItems)) {
+                try (PreparedStatement ps1 = con.prepareStatement(delItems)) {
                     ps1.setInt(1, itemId);
                     ps1.executeUpdate();
                 }
-
                 String delTrans = "DELETE FROM transactions WHERE TransactionId = ?";
-                try (java.sql.PreparedStatement ps2 = con.prepareStatement(delTrans)) {
+                try (PreparedStatement ps2 = con.prepareStatement(delTrans)) {
                     ps2.setInt(1, transId);
                     ps2.executeUpdate();
                 }
-                
-                con.commit();
                 JOptionPane.showMessageDialog(null, "Transaction deleted. Stock and Tickets restored.");
                 
                 loadTransactionTableData(); 
-                loadGarageData(); 
+                loadGarageData();
+                updateDashboardTicketsDisplay(lblSold, lblRemaining, progressBarTicket); 
             }
-
         } catch (Exception ex) {
-            try { con.rollback(); } catch (Exception ignore) {}
             JOptionPane.showMessageDialog(null, "Error during deletion: " + ex.getMessage());
             ex.printStackTrace();
-        } finally {
-            try { con.setAutoCommit(true); } catch (Exception ignore) {}
-        }
+        } 
     }
     
     private void loadTransactionTableData() {
@@ -1157,8 +1463,8 @@ public class start extends JFrame {
                 "JOIN students s ON t.StudentId = s.StudentId " +
                 "JOIN categories c ON ti.CategoryId = c.CategoryId";
 
-        try (java.sql.Statement stmt = con.createStatement();
-             java.sql.ResultSet rs = stmt.executeQuery(query)) {
+        try (Statement stmt = con.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
 
         	while (rs.next()) {
                 model.addRow(new Object[]{
@@ -1196,7 +1502,7 @@ public class start extends JFrame {
             if (con != null) {
                 String sql = "DELETE FROM categories WHERE TableId = ? AND CategoryName = ?";
                 
-                try (java.sql.PreparedStatement pstmt = con.prepareStatement(sql)) {
+                try (PreparedStatement pstmt = con.prepareStatement(sql)) {
                     pstmt.setInt(1, Integer.parseInt(tableId));
                     pstmt.setString(2, categoryName);
                     
@@ -1213,7 +1519,6 @@ public class start extends JFrame {
         }
     }
     
-
     private void updateTransactionCategories(String tableId, JComboBox categoryCombo) {
         categoryCombo.removeAllItems();
         
@@ -1222,9 +1527,9 @@ public class start extends JFrame {
 
         String query = "SELECT CategoryName FROM categories WHERE TableId = ?";
         
-        try (java.sql.PreparedStatement pstmt = con.prepareStatement(query)) {
+        try (PreparedStatement pstmt = con.prepareStatement(query)) {
             pstmt.setInt(1, Integer.parseInt(tableId));
-            java.sql.ResultSet rs = pstmt.executeQuery();
+            ResultSet rs = pstmt.executeQuery();
             
             while (rs.next()) {
                 categoryCombo.addItem(rs.getString("CategoryName"));
@@ -1260,21 +1565,6 @@ public class start extends JFrame {
             }
         } catch (Exception e) {
             e.printStackTrace();
-        }
-    }
-    
-    
-    private void styleNavButton(JButton btn, boolean active) {
-        btn.setBackground(new Color(185, 11, 41));
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setFont(new Font("Segoe UI", active ? Font.BOLD : Font.PLAIN, active ? 19 : 14));
-    }
-
-    private void updateActive(JButton active, JButton... others) {
-        styleNavButton(active, true);
-        for (JButton btn : others) {
-            styleNavButton(btn, false);
         }
     }
 }
